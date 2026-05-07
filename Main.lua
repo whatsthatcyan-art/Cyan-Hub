@@ -1,4 +1,4 @@
--- Cyan Hub Panel (MOBILE & PC SUPPORTED + FULL CMDS)
+-- Cyan Hub Panel (MOBILE & PC + WALL CHECK)
 -- Place in StarterPlayerScripts
 
 local Players = game:GetService("Players")
@@ -16,12 +16,11 @@ local flying = false
 local noclipping = false
 local invisible = false
 local godmode = false
-local flySpeed = 50
 local AimlockEnabled = false
 local AimPart = "Head"
 local FOVRadius = 150
 
--- // FOV Circle Setup (Centered for Mobile/PC)
+-- // FOV Circle Setup
 local FOVCircle = Drawing.new("Circle")
 FOVCircle.Thickness = 2
 FOVCircle.Color = Color3.fromRGB(255, 0, 0)
@@ -36,21 +35,44 @@ player.CharacterAdded:Connect(function(c)
 	rootPart = c:WaitForChild("HumanoidRootPart")
 end)
 
+-- // Visibility Check (Wall Check) Logic
+local function isVisible(targetPart)
+	local origin = Camera.CFrame.Position
+	local destination = targetPart.Position
+	local direction = (destination - origin).Unit * (destination - origin).Magnitude
+	
+	local raycastParams = RaycastParams.new()
+	raycastParams.FilterDescendantsInstances = {player.Character, Camera} -- Ignore yourself
+	raycastParams.FilterType = Enum.RaycastFilterType.Exclude
+	
+	local result = workspace:Raycast(origin, direction, raycastParams)
+	
+	if result then
+		-- If the ray hits the target player's character, they are visible
+		return result.Instance:IsDescendantOf(targetPart.Parent)
+	end
+	return false
+end
+
 -- // Center-Screen Target Logic
 local function getClosestPlayer()
 	local closestPlayer = nil
 	local shortestDistance = math.huge
-	-- Use Center of Screen for Mobile Compatibility
 	local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
 
 	for _, v in pairs(Players:GetPlayers()) do
 		if v ~= player and v.Character and v.Character:FindFirstChild(AimPart) and v.Character:FindFirstChild("Humanoid") and v.Character.Humanoid.Health > 0 then
-			local pos, onScreen = Camera:WorldToViewportPoint(v.Character[AimPart].Position)
+			local targetPart = v.Character[AimPart]
+			local pos, onScreen = Camera:WorldToViewportPoint(targetPart.Position)
+			
 			if onScreen then
-				local magnitude = (Vector2.new(pos.X, pos.Y) - screenCenter).Magnitude
-				if magnitude < FOVRadius and magnitude < shortestDistance then
-					closestPlayer = v
-					shortestDistance = magnitude
+				-- Perform Wall Check here
+				if isVisible(targetPart) then
+					local magnitude = (Vector2.new(pos.X, pos.Y) - screenCenter).Magnitude
+					if magnitude < FOVRadius and magnitude < shortestDistance then
+						closestPlayer = v
+						shortestDistance = magnitude
+					end
 				end
 			end
 		end
@@ -66,12 +88,10 @@ player.Chatted:Connect(function(msg)
 	end
 end)
 
--- // Main Update Loop (Handles Noclip, Fly, and Aimlock)
+-- // Main Update Loop
 RunService.RenderStepped:Connect(function()
-	-- Keep Circle locked to center of screen
 	FOVCircle.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
 	
-	-- Aimlock Lock-on
 	if AimlockEnabled then
 		local target = getClosestPlayer()
 		if target and target.Character and target.Character:FindFirstChild(AimPart) then
@@ -79,14 +99,12 @@ RunService.RenderStepped:Connect(function()
 		end
 	end
 
-	-- Noclip logic
 	if noclipping and character then
 		for _, part in pairs(character:GetDescendants()) do
 			if part:IsA("BasePart") then part.CanCollide = false end
 		end
 	end
 	
-	-- Godmode logic
 	if godmode and humanoid then
 		humanoid.Health = humanoid.MaxHealth
 	end
@@ -96,7 +114,6 @@ end)
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "CyanHub"
 screenGui.ResetOnSpawn = false
-screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 screenGui.Parent = player.PlayerGui
 
 local panel = Instance.new("Frame")
@@ -140,7 +157,6 @@ content.Parent = panel
 local layout = Instance.new("UIListLayout", content)
 layout.Padding = UDim.new(0, 6)
 
--- Helper Functions
 local function makeLabel(text)
 	local lbl = Instance.new("TextLabel")
 	lbl.Size = UDim2.new(1, 0, 0, 18)
@@ -213,4 +229,4 @@ UserInputService.InputBegan:Connect(function(input, gpe)
 	end
 end)
 
-print("Cyan Hub Full Loaded. Aimlock centered for mobile compatibility.")
+print("Cyan Hub Loaded with Wall Check.")
