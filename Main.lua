@@ -10,17 +10,16 @@ local character = player.Character or player.CharacterAdded:Wait()
 local humanoid = character:WaitForChild("Humanoid")
 local rootPart = character:WaitForChild("HumanoidRootPart")
 
--- State
 local flying = false
 local noclipping = false
 local invisible = false
 local godmode = false
 local flySpeed = 50
 local jumpHeight = 50
+local walkSpeed = 16
 local flyConnection = nil
 local noclipConnection = nil
 
--- Refresh refs on respawn
 player.CharacterAdded:Connect(function(c)
 	character = c
 	humanoid = c:WaitForChild("Humanoid")
@@ -31,20 +30,18 @@ player.CharacterAdded:Connect(function(c)
 	godmode = false
 end)
 
--- GUI
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "CyanHub"
 screenGui.ResetOnSpawn = false
 screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 screenGui.Parent = player.PlayerGui
 
--- Toggle button (shown when hidden)
 local toggleBtn = Instance.new("TextButton")
 toggleBtn.Size = UDim2.new(0, 100, 0, 30)
 toggleBtn.Position = UDim2.new(0, 10, 0, 10)
 toggleBtn.BackgroundColor3 = Color3.fromRGB(0, 180, 220)
 toggleBtn.TextColor3 = Color3.new(1, 1, 1)
-toggleBtn.Text = "✦ Cyan Hub"
+toggleBtn.Text = "Cyan Hub"
 toggleBtn.Font = Enum.Font.GothamBold
 toggleBtn.TextSize = 13
 toggleBtn.BorderSizePixel = 0
@@ -52,9 +49,8 @@ toggleBtn.Visible = false
 toggleBtn.Parent = screenGui
 Instance.new("UICorner", toggleBtn).CornerRadius = UDim.new(0, 6)
 
--- Main panel
 local panel = Instance.new("Frame")
-panel.Size = UDim2.new(0, 270, 0, 460)
+panel.Size = UDim2.new(0, 270, 0, 480)
 panel.Position = UDim2.new(0, 10, 0, 10)
 panel.BackgroundColor3 = Color3.fromRGB(12, 12, 18)
 panel.BorderSizePixel = 0
@@ -65,7 +61,6 @@ local stroke = Instance.new("UIStroke", panel)
 stroke.Color = Color3.fromRGB(0, 200, 255)
 stroke.Thickness = 2
 
--- Title bar
 local titleBar = Instance.new("Frame")
 titleBar.Size = UDim2.new(1, 0, 0, 40)
 titleBar.BackgroundColor3 = Color3.fromRGB(0, 170, 210)
@@ -73,7 +68,6 @@ titleBar.BorderSizePixel = 0
 titleBar.Parent = panel
 Instance.new("UICorner", titleBar).CornerRadius = UDim.new(0, 10)
 
--- Fix bottom corners of title bar
 local tbFix = Instance.new("Frame")
 tbFix.Size = UDim2.new(1, 0, 0.5, 0)
 tbFix.Position = UDim2.new(0, 0, 0.5, 0)
@@ -92,7 +86,6 @@ titleLabel.TextSize = 16
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
 titleLabel.Parent = titleBar
 
--- Hide button
 local hideBtn = Instance.new("TextButton")
 hideBtn.Size = UDim2.new(0, 28, 0, 24)
 hideBtn.Position = UDim2.new(1, -62, 0.5, -12)
@@ -105,7 +98,6 @@ hideBtn.BorderSizePixel = 0
 hideBtn.Parent = titleBar
 Instance.new("UICorner", hideBtn).CornerRadius = UDim.new(0, 5)
 
--- Close button
 local closeBtn = Instance.new("TextButton")
 closeBtn.Size = UDim2.new(0, 28, 0, 24)
 closeBtn.Position = UDim2.new(1, -30, 0.5, -12)
@@ -118,7 +110,6 @@ closeBtn.BorderSizePixel = 0
 closeBtn.Parent = titleBar
 Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(0, 5)
 
--- Scrollable content
 local content = Instance.new("ScrollingFrame")
 content.Size = UDim2.new(1, -16, 1, -50)
 content.Position = UDim2.new(0, 8, 0, 48)
@@ -137,7 +128,6 @@ local padding = Instance.new("UIPadding", content)
 padding.PaddingTop = UDim.new(0, 4)
 padding.PaddingBottom = UDim.new(0, 4)
 
--- Helper: section label
 local function makeLabel(text)
 	local lbl = Instance.new("TextLabel")
 	lbl.Size = UDim2.new(1, 0, 0, 18)
@@ -148,16 +138,14 @@ local function makeLabel(text)
 	lbl.TextSize = 11
 	lbl.TextXAlignment = Enum.TextXAlignment.Left
 	lbl.Parent = content
-	return lbl
 end
 
--- Helper: toggle button
 local function makeToggle(labelText, callback)
 	local btn = Instance.new("TextButton")
 	btn.Size = UDim2.new(1, 0, 0, 36)
 	btn.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
 	btn.TextColor3 = Color3.fromRGB(180, 180, 180)
-	btn.Text = "⬜  " .. labelText
+	btn.Text = "[OFF]  " .. labelText
 	btn.Font = Enum.Font.Gotham
 	btn.TextSize = 13
 	btn.TextXAlignment = Enum.TextXAlignment.Left
@@ -170,15 +158,15 @@ local function makeToggle(labelText, callback)
 	local active = false
 	btn.MouseButton1Click:Connect(function()
 		active = not active
-		btn.Text = (active and "✅  " or "⬜  ") .. labelText
+		btn.Text = (active and "[ON]  " or "[OFF]  ") .. labelText
 		btn.TextColor3 = active and Color3.fromRGB(0, 220, 255) or Color3.fromRGB(180, 180, 180)
+		btn.BackgroundColor3 = active and Color3.fromRGB(0, 50, 70) or Color3.fromRGB(25, 25, 35)
 		callback(active)
 	end)
-	return btn
 end
 
--- Helper: slider row
-local function makeSlider(labelText, min, max, default, callback)
+-- Fixed slider using InputBegan/Changed on the track itself
+local function makeSlider(labelText, minVal, maxVal, default, callback)
 	local holder = Instance.new("Frame")
 	holder.Size = UDim2.new(1, 0, 0, 54)
 	holder.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
@@ -187,7 +175,7 @@ local function makeSlider(labelText, min, max, default, callback)
 	Instance.new("UICorner", holder).CornerRadius = UDim.new(0, 7)
 
 	local lbl = Instance.new("TextLabel")
-	lbl.Size = UDim2.new(0.7, 0, 0, 22)
+	lbl.Size = UDim2.new(1, -10, 0, 22)
 	lbl.Position = UDim2.new(0, 10, 0, 4)
 	lbl.BackgroundTransparency = 1
 	lbl.Text = labelText .. ": " .. default
@@ -198,45 +186,67 @@ local function makeSlider(labelText, min, max, default, callback)
 	lbl.Parent = holder
 
 	local track = Instance.new("Frame")
-	track.Size = UDim2.new(1, -20, 0, 6)
-	track.Position = UDim2.new(0, 10, 0, 32)
+	track.Size = UDim2.new(1, -20, 0, 8)
+	track.Position = UDim2.new(0, 10, 0, 34)
 	track.BackgroundColor3 = Color3.fromRGB(50, 50, 65)
 	track.BorderSizePixel = 0
 	track.Parent = holder
-	Instance.new("UICorner", track).CornerRadius = UDim.new(0, 3)
+	Instance.new("UICorner", track).CornerRadius = UDim.new(0, 4)
 
 	local fill = Instance.new("Frame")
-	fill.Size = UDim2.new((default - min) / (max - min), 0, 1, 0)
+	fill.Size = UDim2.new((default - minVal) / (maxVal - minVal), 0, 1, 0)
 	fill.BackgroundColor3 = Color3.fromRGB(0, 200, 255)
 	fill.BorderSizePixel = 0
 	fill.Parent = track
-	Instance.new("UICorner", fill).CornerRadius = UDim.new(0, 3)
+	Instance.new("UICorner", fill).CornerRadius = UDim.new(0, 4)
 
-	local knob = Instance.new("TextButton")
-	knob.Size = UDim2.new(0, 14, 0, 14)
-	knob.Position = UDim2.new((default - min) / (max - min), -7, 0.5, -7)
+	local knob = Instance.new("Frame")
+	knob.Size = UDim2.new(0, 16, 0, 16)
+	knob.Position = UDim2.new((default - minVal) / (maxVal - minVal), -8, 0.5, -8)
 	knob.BackgroundColor3 = Color3.new(1, 1, 1)
-	knob.Text = ""
 	knob.BorderSizePixel = 0
 	knob.Parent = track
 	Instance.new("UICorner", knob).CornerRadius = UDim.new(1, 0)
 
 	local dragging = false
-	knob.MouseButton1Down:Connect(function() dragging = true end)
-	UserInputService.InputEnded:Connect(function(i)
-		if i.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end
+
+	local function updateSlider(inputX)
+		local trackAbs = track.AbsolutePosition
+		local trackSize = track.AbsoluteSize
+		local rel = math.clamp((inputX - trackAbs.X) / trackSize.X, 0, 1)
+		local val = math.floor(minVal + rel * (maxVal - minVal))
+		fill.Size = UDim2.new(rel, 0, 1, 0)
+		knob.Position = UDim2.new(rel, -8, 0.5, -8)
+		lbl.Text = labelText .. ": " .. val
+		callback(val)
+	end
+
+	track.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or
+			input.UserInputType == Enum.UserInputType.Touch then
+			dragging = true
+			updateSlider(input.Position.X)
+		end
 	end)
-	RunService.Heartbeat:Connect(function()
-		if dragging then
-			local mouse = player:GetMouse()
-			local trackPos = track.AbsolutePosition.X
-			local trackSize = track.AbsoluteSize.X
-			local rel = math.clamp((mouse.X - trackPos) / trackSize, 0, 1)
-			local val = math.floor(min + rel * (max - min))
-			fill.Size = UDim2.new(rel, 0, 1, 0)
-			knob.Position = UDim2.new(rel, -7, 0.5, -7)
-			lbl.Text = labelText .. ": " .. val
-			callback(val)
+
+	knob.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or
+			input.UserInputType == Enum.UserInputType.Touch then
+			dragging = true
+		end
+	end)
+
+	UserInputService.InputChanged:Connect(function(input)
+		if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or
+			input.UserInputType == Enum.UserInputType.Touch) then
+			updateSlider(input.Position.X)
+		end
+	end)
+
+	UserInputService.InputEnded:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or
+			input.UserInputType == Enum.UserInputType.Touch then
+			dragging = false
 		end
 	end)
 end
@@ -245,7 +255,6 @@ end
 
 makeLabel("  MOVEMENT")
 
--- Fly
 makeToggle("Fly", function(on)
 	flying = on
 	if on then
@@ -280,15 +289,12 @@ makeToggle("Fly", function(on)
 	end
 end)
 
--- Noclip
 makeToggle("Noclip", function(on)
 	noclipping = on
 	if on then
 		noclipConnection = RunService.Stepped:Connect(function()
 			for _, p in ipairs(character:GetDescendants()) do
-				if p:IsA("BasePart") then
-					p.CanCollide = false
-				end
+				if p:IsA("BasePart") then p.CanCollide = false end
 			end
 		end)
 	else
@@ -318,7 +324,6 @@ end)
 
 makeLabel("  MISC")
 
--- Invisible
 makeToggle("Invisible", function(on)
 	invisible = on
 	for _, p in ipairs(character:GetDescendants()) do
@@ -326,13 +331,9 @@ makeToggle("Invisible", function(on)
 			p.Transparency = on and 1 or 0
 		end
 	end
-	-- Keep HRP invisible but physical
-	if on then
-		rootPart.Transparency = 1
-	end
+	if on then rootPart.Transparency = 1 end
 end)
 
--- Godmode
 makeToggle("Godmode", function(on)
 	godmode = on
 	if on then
