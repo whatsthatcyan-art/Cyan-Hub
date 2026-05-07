@@ -1,4 +1,4 @@
--- Cyan Hub Panel (FULLY RESTORED + AIMLOCK)
+-- Cyan Hub Panel (MOBILE & PC SUPPORTED + FULL CMDS)
 -- Place in StarterPlayerScripts
 
 local Players = game:GetService("Players")
@@ -11,23 +11,17 @@ local character = player.Character or player.CharacterAdded:Wait()
 local humanoid = character:WaitForChild("Humanoid")
 local rootPart = character:WaitForChild("HumanoidRootPart")
 
--- // Original Variables
+-- // Variables
 local flying = false
 local noclipping = false
 local invisible = false
 local godmode = false
 local flySpeed = 50
-local jumpHeight = 50
-local walkSpeed = 16
-local flyConnection = nil
-local noclipConnection = nil
-
--- // Aimlock Variables
 local AimlockEnabled = false
 local AimPart = "Head"
 local FOVRadius = 150
 
--- // FOV Circle Setup
+-- // FOV Circle Setup (Centered for Mobile/PC)
 local FOVCircle = Drawing.new("Circle")
 FOVCircle.Thickness = 2
 FOVCircle.Color = Color3.fromRGB(255, 0, 0)
@@ -40,23 +34,20 @@ player.CharacterAdded:Connect(function(c)
 	character = c
 	humanoid = c:WaitForChild("Humanoid")
 	rootPart = c:WaitForChild("HumanoidRootPart")
-	flying = false
-	noclipping = false
-	invisible = false
-	godmode = false
 end)
 
--- // Aimlock Logic
+-- // Center-Screen Target Logic
 local function getClosestPlayer()
 	local closestPlayer = nil
 	local shortestDistance = math.huge
-	local mousePos = UserInputService:GetMouseLocation()
+	-- Use Center of Screen for Mobile Compatibility
+	local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
 
 	for _, v in pairs(Players:GetPlayers()) do
 		if v ~= player and v.Character and v.Character:FindFirstChild(AimPart) and v.Character:FindFirstChild("Humanoid") and v.Character.Humanoid.Health > 0 then
 			local pos, onScreen = Camera:WorldToViewportPoint(v.Character[AimPart].Position)
 			if onScreen then
-				local magnitude = (Vector2.new(pos.X, pos.Y) - mousePos).Magnitude
+				local magnitude = (Vector2.new(pos.X, pos.Y) - screenCenter).Magnitude
 				if magnitude < FOVRadius and magnitude < shortestDistance then
 					closestPlayer = v
 					shortestDistance = magnitude
@@ -67,7 +58,7 @@ local function getClosestPlayer()
 	return closestPlayer
 end
 
--- // Chat Command Logic
+-- // Chat Command Listener
 player.Chatted:Connect(function(msg)
 	if string.lower(msg) == "/aimlock" then
 		AimlockEnabled = not AimlockEnabled
@@ -75,10 +66,12 @@ player.Chatted:Connect(function(msg)
 	end
 end)
 
--- // Main Update Loop (Handles Noclip & Aimlock)
+-- // Main Update Loop (Handles Noclip, Fly, and Aimlock)
 RunService.RenderStepped:Connect(function()
-	FOVCircle.Position = UserInputService:GetMouseLocation()
+	-- Keep Circle locked to center of screen
+	FOVCircle.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
 	
+	-- Aimlock Lock-on
 	if AimlockEnabled then
 		local target = getClosestPlayer()
 		if target and target.Character and target.Character:FindFirstChild(AimPart) then
@@ -86,21 +79,28 @@ RunService.RenderStepped:Connect(function()
 		end
 	end
 
+	-- Noclip logic
 	if noclipping and character then
 		for _, part in pairs(character:GetDescendants()) do
 			if part:IsA("BasePart") then part.CanCollide = false end
 		end
 	end
+	
+	-- Godmode logic
+	if godmode and humanoid then
+		humanoid.Health = humanoid.MaxHealth
+	end
 end)
 
--- // UI SETUP
+-- // UI PANEL SETUP
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "CyanHub"
 screenGui.ResetOnSpawn = false
+screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 screenGui.Parent = player.PlayerGui
 
 local panel = Instance.new("Frame")
-panel.Size = UDim2.new(0, 270, 0, 480)
+panel.Size = UDim2.new(0, 270, 0, 420)
 panel.Position = UDim2.new(0, 10, 0, 10)
 panel.BackgroundColor3 = Color3.fromRGB(12, 12, 18)
 panel.Active = true
@@ -175,7 +175,7 @@ local function makeToggle(labelText, callback)
 	end)
 end
 
--- // LISTING THE COMMANDS
+-- // LISTING COMMANDS
 makeLabel("COMBAT")
 makeToggle("Aimlock (/aimlock)", function(state)
 	AimlockEnabled = state
@@ -188,32 +188,29 @@ makeToggle("Noclip", function(state) noclipping = state end)
 
 makeLabel("PLAYER")
 makeToggle("Invisible", function(state) 
-	invisible = state 
 	if character then
 		for _, v in pairs(character:GetDescendants()) do
-			if v:IsA("BasePart") or v:IsA("Decal") then
-				v.Transparency = state and 1 or 0
-			end
+			if v:IsA("BasePart") or v:IsA("Decal") then v.Transparency = state and 1 or 0 end
 		end
 	end
 end)
 
 makeToggle("Godmode", function(state) 
-	godmode = state 
-	if godmode and humanoid then
-		humanoid.MaxHealth = math.huge
-		humanoid.Health = math.huge
+	godmode = state
+	if state and humanoid then
+		humanoid.MaxHealth = 9e9
+		humanoid.Health = 9e9
 	else
 		humanoid.MaxHealth = 100
 		humanoid.Health = 100
 	end
 end)
 
-print("Cyan Hub FULLY Restored. Keybind: RightControl")
-
--- Toggle UI Keybind
+-- Toggle UI Keybind (RightControl)
 UserInputService.InputBegan:Connect(function(input, gpe)
 	if not gpe and input.KeyCode == Enum.KeyCode.RightControl then
 		panel.Visible = not panel.Visible
 	end
 end)
+
+print("Cyan Hub Full Loaded. Aimlock centered for mobile compatibility.")
