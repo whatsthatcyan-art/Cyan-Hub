@@ -17,11 +17,15 @@ local invisible = false
 local godmode = false
 local AimlockEnabled = false
 local espEnabled = false
+local infJumpEnabled = false
 local AimPart = "Head"
 local FOVRadius = 150
 local flySpeed = 50
 local flyConnection = nil
 local savedTeleportPos = nil
+
+local currentSpeed = 16
+local currentJumpPower = 50
 
 -- Mobile fly direction flags
 local mobileUp = false
@@ -39,6 +43,16 @@ player.CharacterAdded:Connect(function(c)
 	character = c
 	humanoid = c:WaitForChild("Humanoid")
 	rootPart = c:WaitForChild("HumanoidRootPart")
+	-- Reapply speed/jump on respawn
+	humanoid.WalkSpeed = currentSpeed
+	humanoid.JumpPower = currentJumpPower
+end)
+
+-- Infinite Jump
+UserInputService.JumpRequest:Connect(function()
+	if infJumpEnabled and humanoid then
+		humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+	end
 end)
 
 -- ESP
@@ -216,17 +230,14 @@ local function startFly()
 	flyConnection = RunService.Heartbeat:Connect(function()
 		if not flying then return end
 		local dir = Vector3.zero
-		-- PC controls
 		if UserInputService:IsKeyDown(Enum.KeyCode.W) then dir = dir + Camera.CFrame.LookVector end
 		if UserInputService:IsKeyDown(Enum.KeyCode.S) then dir = dir - Camera.CFrame.LookVector end
 		if UserInputService:IsKeyDown(Enum.KeyCode.A) then dir = dir - Camera.CFrame.RightVector end
 		if UserInputService:IsKeyDown(Enum.KeyCode.D) then dir = dir + Camera.CFrame.RightVector end
 		if UserInputService:IsKeyDown(Enum.KeyCode.Space) then dir = dir + Vector3.new(0, 1, 0) end
 		if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then dir = dir - Vector3.new(0, 1, 0) end
-		-- Mobile up/down
 		if mobileUp then dir = dir + Vector3.new(0, 1, 0) end
 		if mobileDown then dir = dir - Vector3.new(0, 1, 0) end
-		-- On mobile, also fly in camera direction using thumbstick via humanoid move direction
 		local moveDir = humanoid.MoveDirection
 		if moveDir.Magnitude > 0 then
 			dir = dir + Vector3.new(moveDir.X, 0, moveDir.Z)
@@ -249,7 +260,7 @@ screenGui.Name = "CyanHub"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = player.PlayerGui
 
--- Mobile fly buttons (Up/Down)
+-- Mobile fly buttons
 local mobileControls = Instance.new("Frame")
 mobileControls.Size = UDim2.new(0, 110, 0, 50)
 mobileControls.Position = UDim2.new(1, -120, 1, -160)
@@ -262,7 +273,7 @@ upBtn.Size = UDim2.new(0, 50, 0, 50)
 upBtn.Position = UDim2.new(0, 0, 0, 0)
 upBtn.BackgroundColor3 = Color3.fromRGB(0, 170, 210)
 upBtn.TextColor3 = Color3.new(1, 1, 1)
-upBtn.Text = "▲"
+upBtn.Text = "â–²"
 upBtn.Font = Enum.Font.GothamBold
 upBtn.TextSize = 20
 upBtn.BorderSizePixel = 0
@@ -274,7 +285,7 @@ downBtn.Size = UDim2.new(0, 50, 0, 50)
 downBtn.Position = UDim2.new(0, 58, 0, 0)
 downBtn.BackgroundColor3 = Color3.fromRGB(0, 100, 140)
 downBtn.TextColor3 = Color3.new(1, 1, 1)
-downBtn.Text = "▼"
+downBtn.Text = "â–¼"
 downBtn.Font = Enum.Font.GothamBold
 downBtn.TextSize = 20
 downBtn.BorderSizePixel = 0
@@ -282,25 +293,16 @@ downBtn.Parent = mobileControls
 Instance.new("UICorner", downBtn).CornerRadius = UDim.new(0, 8)
 
 upBtn.InputBegan:Connect(function(i)
-	if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then
-		mobileUp = true
-	end
+	if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then mobileUp = true end
 end)
 upBtn.InputEnded:Connect(function(i)
-	if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then
-		mobileUp = false
-	end
+	if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then mobileUp = false end
 end)
-
 downBtn.InputBegan:Connect(function(i)
-	if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then
-		mobileDown = true
-	end
+	if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then mobileDown = true end
 end)
 downBtn.InputEnded:Connect(function(i)
-	if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then
-		mobileDown = false
-	end
+	if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then mobileDown = false end
 end)
 
 local toggleBtn = Instance.new("TextButton")
@@ -308,7 +310,7 @@ toggleBtn.Size = UDim2.new(0, 100, 0, 30)
 toggleBtn.Position = UDim2.new(0, 10, 0, 10)
 toggleBtn.BackgroundColor3 = Color3.fromRGB(0, 180, 220)
 toggleBtn.TextColor3 = Color3.new(1, 1, 1)
-toggleBtn.Text = "✦ Cyan Hub"
+toggleBtn.Text = "âœ¦ Cyan Hub"
 toggleBtn.Font = Enum.Font.GothamBold
 toggleBtn.TextSize = 13
 toggleBtn.BorderSizePixel = 0
@@ -317,7 +319,7 @@ toggleBtn.Parent = screenGui
 Instance.new("UICorner", toggleBtn).CornerRadius = UDim.new(0, 6)
 
 local panel = Instance.new("Frame")
-panel.Size = UDim2.new(0, 270, 0, 480)
+panel.Size = UDim2.new(0, 270, 0, 580)
 panel.Position = UDim2.new(0, 10, 0, 10)
 panel.BackgroundColor3 = Color3.fromRGB(12, 12, 18)
 panel.Active = true
@@ -346,7 +348,7 @@ local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, -80, 1, 0)
 titleLabel.Position = UDim2.new(0, 10, 0, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "✦ Cyan Hub"
+titleLabel.Text = "âœ¦ Cyan Hub"
 titleLabel.TextColor3 = Color3.new(1, 1, 1)
 titleLabel.Font = Enum.Font.GothamBold
 titleLabel.TextSize = 16
@@ -358,7 +360,7 @@ hideBtn.Size = UDim2.new(0, 28, 0, 24)
 hideBtn.Position = UDim2.new(1, -62, 0.5, -12)
 hideBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 55)
 hideBtn.TextColor3 = Color3.new(1, 1, 1)
-hideBtn.Text = "—"
+hideBtn.Text = "â€”"
 hideBtn.Font = Enum.Font.GothamBold
 hideBtn.TextSize = 14
 hideBtn.BorderSizePixel = 0
@@ -370,7 +372,7 @@ closeBtn.Size = UDim2.new(0, 28, 0, 24)
 closeBtn.Position = UDim2.new(1, -30, 0.5, -12)
 closeBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
 closeBtn.TextColor3 = Color3.new(1, 1, 1)
-closeBtn.Text = "✕"
+closeBtn.Text = "âœ•"
 closeBtn.Font = Enum.Font.GothamBold
 closeBtn.TextSize = 14
 closeBtn.BorderSizePixel = 0
@@ -446,6 +448,76 @@ local function makeButton(labelText, color, callback)
 	return btn
 end
 
+-- Stepper row: label on left, minus/value/plus on right
+local function makeStepper(labelText, defaultVal, minVal, maxVal, step, onChange)
+	local row = Instance.new("Frame")
+	row.Size = UDim2.new(1, 0, 0, 36)
+	row.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+	row.BorderSizePixel = 0
+	row.Parent = content
+	Instance.new("UICorner", row).CornerRadius = UDim.new(0, 7)
+
+	local lbl = Instance.new("TextLabel")
+	lbl.Size = UDim2.new(0.5, 0, 1, 0)
+	lbl.Position = UDim2.new(0, 10, 0, 0)
+	lbl.BackgroundTransparency = 1
+	lbl.Text = labelText
+	lbl.TextColor3 = Color3.fromRGB(180, 180, 180)
+	lbl.Font = Enum.Font.Gotham
+	lbl.TextSize = 13
+	lbl.TextXAlignment = Enum.TextXAlignment.Left
+	lbl.Parent = row
+
+	local minusBtn = Instance.new("TextButton")
+	minusBtn.Size = UDim2.new(0, 28, 0, 26)
+	minusBtn.Position = UDim2.new(1, -96, 0.5, -13)
+	minusBtn.BackgroundColor3 = Color3.fromRGB(0, 100, 140)
+	minusBtn.TextColor3 = Color3.new(1,1,1)
+	minusBtn.Text = "âˆ’"
+	minusBtn.Font = Enum.Font.GothamBold
+	minusBtn.TextSize = 16
+	minusBtn.BorderSizePixel = 0
+	minusBtn.Parent = row
+	Instance.new("UICorner", minusBtn).CornerRadius = UDim.new(0, 5)
+
+	local valLbl = Instance.new("TextLabel")
+	valLbl.Size = UDim2.new(0, 36, 0, 26)
+	valLbl.Position = UDim2.new(1, -64, 0.5, -13)
+	valLbl.BackgroundTransparency = 1
+	valLbl.Text = tostring(defaultVal)
+	valLbl.TextColor3 = Color3.fromRGB(0, 220, 255)
+	valLbl.Font = Enum.Font.GothamBold
+	valLbl.TextSize = 13
+	valLbl.Parent = row
+
+	local plusBtn = Instance.new("TextButton")
+	plusBtn.Size = UDim2.new(0, 28, 0, 26)
+	plusBtn.Position = UDim2.new(1, -30, 0.5, -13)
+	plusBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 190)
+	plusBtn.TextColor3 = Color3.new(1,1,1)
+	plusBtn.Text = "+"
+	plusBtn.Font = Enum.Font.GothamBold
+	plusBtn.TextSize = 16
+	plusBtn.BorderSizePixel = 0
+	plusBtn.Parent = row
+	Instance.new("UICorner", plusBtn).CornerRadius = UDim.new(0, 5)
+
+	local val = defaultVal
+
+	minusBtn.MouseButton1Click:Connect(function()
+		val = math.max(minVal, val - step)
+		valLbl.Text = tostring(val)
+		onChange(val)
+	end)
+	plusBtn.MouseButton1Click:Connect(function()
+		val = math.min(maxVal, val + step)
+		valLbl.Text = tostring(val)
+		onChange(val)
+	end)
+
+	return valLbl
+end
+
 -- SECTIONS
 
 makeLabel("COMBAT")
@@ -480,6 +552,21 @@ makeToggle("Noclip", function(state)
 			if p:IsA("BasePart") then p.CanCollide = true end
 		end
 	end
+end)
+makeToggle("Infinite Jump", function(state)
+	infJumpEnabled = state
+end)
+
+makeLabel("SPEED")
+makeStepper("Walk Speed", currentSpeed, 4, 500, 4, function(val)
+	currentSpeed = val
+	if humanoid then humanoid.WalkSpeed = val end
+end)
+
+makeLabel("JUMP POWER")
+makeStepper("Jump Power", currentJumpPower, 10, 500, 10, function(val)
+	currentJumpPower = val
+	if humanoid then humanoid.JumpPower = val end
 end)
 
 makeLabel("TELEPORT")
@@ -521,6 +608,7 @@ makeToggle("Invisible", function(state)
 		for _, v in pairs(character:GetDescendants()) do
 			if v:IsA("BasePart") or v:IsA("Decal") then
 				v.Transparency = state and 1 or 0
+			end
 			end
 		end
 	end
