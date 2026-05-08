@@ -1,4 +1,4 @@
--- Cyan Hub Panel (MOBILE & PC + WALL CHECK)
+-- Cyan Hub Panel (MOBILE & PC + WALL CHECK + ESP)
 -- Place in StarterPlayerScripts
 
 local Players = game:GetService("Players")
@@ -11,16 +11,17 @@ local character = player.Character or player.CharacterAdded:Wait()
 local humanoid = character:WaitForChild("Humanoid")
 local rootPart = character:WaitForChild("HumanoidRootPart")
 
--- // Variables
 local flying = false
 local noclipping = false
 local invisible = false
 local godmode = false
 local AimlockEnabled = false
+local espEnabled = false
 local AimPart = "Head"
 local FOVRadius = 150
+local flySpeed = 50
+local flyConnection = nil
 
--- // FOV Circle Setup
 local FOVCircle = Drawing.new("Circle")
 FOVCircle.Thickness = 2
 FOVCircle.Color = Color3.fromRGB(255, 0, 0)
@@ -35,44 +36,161 @@ player.CharacterAdded:Connect(function(c)
 	rootPart = c:WaitForChild("HumanoidRootPart")
 end)
 
--- // Visibility Check (Wall Check) Logic
+-- // ESP Storage
+local espObjects = {}
+
+local function removeESP(p)
+	if espObjects[p] then
+		for _, obj in pairs(espObjects[p]) do
+			obj:Remove()
+		end
+		espObjects[p] = nil
+	end
+end
+
+local function createESP(p)
+	if p == player then return end
+	removeESP(p)
+
+	local box = Drawing.new("Square")
+	box.Thickness = 1
+	box.Color = Color3.fromRGB(0, 200, 255)
+	box.Transparency = 1
+	box.Filled = false
+	box.Visible = false
+
+	local nameLbl = Drawing.new("Text")
+	nameLbl.Size = 14
+	nameLbl.Color = Color3.fromRGB(0, 200, 255)
+	nameLbl.Transparency = 1
+	nameLbl.Center = true
+	nameLbl.Outline = true
+	nameLbl.Visible = false
+	nameLbl.Text = p.Name
+
+	local healthLbl = Drawing.new("Text")
+	healthLbl.Size = 12
+	healthLbl.Color = Color3.fromRGB(0, 255, 100)
+	healthLbl.Transparency = 1
+	healthLbl.Center = true
+	healthLbl.Outline = true
+	healthLbl.Visible = false
+
+	local distLbl = Drawing.new("Text")
+	distLbl.Size = 12
+	distLbl.Color = Color3.fromRGB(255, 220, 0)
+	distLbl.Transparency = 1
+	distLbl.Center = true
+	distLbl.Outline = true
+	distLbl.Visible = false
+
+	espObjects[p] = {box, nameLbl, healthLbl, distLbl}
+end
+
+local function updateESP()
+	for _, p in pairs(Players:GetPlayers()) do
+		if p == player then continue end
+
+		if not espObjects[p] and espEnabled then
+			createESP(p)
+		end
+
+		if espObjects[p] then
+			local char = p.Character
+			local box = espObjects[p][1]
+			local nameLbl = espObjects[p][2]
+			local healthLbl = espObjects[p][3]
+			local distLbl = espObjects[p][4]
+
+			if not espEnabled or not char or not char:FindFirstChild("HumanoidRootPart") or not char:FindFirstChild("Humanoid") then
+				box.Visible = false
+				nameLbl.Visible = false
+				healthLbl.Visible = false
+				distLbl.Visible = false
+				continue
+			end
+
+			local hrp = char.HumanoidRootPart
+			local hum = char.Humanoid
+			local rootPos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
+
+			if not onScreen then
+				box.Visible = false
+				nameLbl.Visible = false
+				healthLbl.Visible = false
+				distLbl.Visible = false
+				continue
+			end
+
+			-- Calculate box from head + root
+			local head = char:FindFirstChild("Head")
+			local topPos = head and Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 0.7, 0)) or rootPos
+			local botPos = Camera:WorldToViewportPoint(hrp.Position - Vector3.new(0, 3, 0))
+
+			local height = math.abs(topPos.Y - botPos.Y)
+			local width = height * 0.5
+			local x = rootPos.X - width / 2
+			local y = topPos.Y
+
+			box.Size = Vector2.new(width, height)
+			box.Position = Vector2.new(x, y)
+			box.Visible = true
+
+			nameLbl.Position = Vector2.new(rootPos.X, y - 16)
+			nameLbl.Text = p.Name
+			nameLbl.Visible = true
+
+			local hp = math.floor((hum.Health / hum.MaxHealth) * 100)
+			healthLbl.Position = Vector2.new(rootPos.X, y + height + 2)
+			healthLbl.Text = "HP: " .. hp .. "%"
+			healthLbl.Color = Color3.fromRGB(
+				math.floor(255 * (1 - hum.Health / hum.MaxHealth)),
+				math.floor(255 * (hum.Health / hum.MaxHealth)),
+				0
+			)
+			healthLbl.Visible = true
+
+			local dist = math.floor((rootPart.Position - hrp.Position).Magnitude)
+			distLbl.Position = Vector2.new(rootPos.X, y + height + 14)
+			distLbl.Text = dist .. " studs"
+			distLbl.Visible = true
+		end
+	end
+end
+
+Players.PlayerRemoving:Connect(function(p)
+	removeESP(p)
+end)
+
+-- // Wall Check
 local function isVisible(targetPart)
 	local origin = Camera.CFrame.Position
 	local destination = targetPart.Position
 	local direction = (destination - origin).Unit * (destination - origin).Magnitude
-	
 	local raycastParams = RaycastParams.new()
-	raycastParams.FilterDescendantsInstances = {player.Character, Camera} -- Ignore yourself
+	raycastParams.FilterDescendantsInstances = {player.Character, Camera}
 	raycastParams.FilterType = Enum.RaycastFilterType.Exclude
-	
 	local result = workspace:Raycast(origin, direction, raycastParams)
-	
 	if result then
-		-- If the ray hits the target player's character, they are visible
 		return result.Instance:IsDescendantOf(targetPart.Parent)
 	end
 	return false
 end
 
--- // Center-Screen Target Logic
+-- // Aimlock Target
 local function getClosestPlayer()
 	local closestPlayer = nil
 	local shortestDistance = math.huge
 	local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
-
 	for _, v in pairs(Players:GetPlayers()) do
 		if v ~= player and v.Character and v.Character:FindFirstChild(AimPart) and v.Character:FindFirstChild("Humanoid") and v.Character.Humanoid.Health > 0 then
 			local targetPart = v.Character[AimPart]
 			local pos, onScreen = Camera:WorldToViewportPoint(targetPart.Position)
-			
-			if onScreen then
-				-- Perform Wall Check here
-				if isVisible(targetPart) then
-					local magnitude = (Vector2.new(pos.X, pos.Y) - screenCenter).Magnitude
-					if magnitude < FOVRadius and magnitude < shortestDistance then
-						closestPlayer = v
-						shortestDistance = magnitude
-					end
+			if onScreen and isVisible(targetPart) then
+				local magnitude = (Vector2.new(pos.X, pos.Y) - screenCenter).Magnitude
+				if magnitude < FOVRadius and magnitude < shortestDistance then
+					closestPlayer = v
+					shortestDistance = magnitude
 				end
 			end
 		end
@@ -80,7 +198,6 @@ local function getClosestPlayer()
 	return closestPlayer
 end
 
--- // Chat Command Listener
 player.Chatted:Connect(function(msg)
 	if string.lower(msg) == "/aimlock" then
 		AimlockEnabled = not AimlockEnabled
@@ -88,10 +205,10 @@ player.Chatted:Connect(function(msg)
 	end
 end)
 
--- // Main Update Loop
+-- // Main Loop
 RunService.RenderStepped:Connect(function()
 	FOVCircle.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
-	
+
 	if AimlockEnabled then
 		local target = getClosestPlayer()
 		if target and target.Character and target.Character:FindFirstChild(AimPart) then
@@ -104,20 +221,69 @@ RunService.RenderStepped:Connect(function()
 			if part:IsA("BasePart") then part.CanCollide = false end
 		end
 	end
-	
+
 	if godmode and humanoid then
 		humanoid.Health = humanoid.MaxHealth
 	end
+
+	updateESP()
 end)
 
--- // UI PANEL SETUP
+-- // FLY LOGIC
+local function startFly()
+	if not character or not rootPart then return end
+	humanoid.PlatformStand = true
+	local vel = Instance.new("BodyVelocity", rootPart)
+	vel.Name = "FlyVel"
+	vel.MaxForce = Vector3.new(1e5, 1e5, 1e5)
+	vel.Velocity = Vector3.zero
+	local gyro = Instance.new("BodyGyro", rootPart)
+	gyro.Name = "FlyGyro"
+	gyro.MaxTorque = Vector3.new(1e5, 1e5, 1e5)
+	gyro.P = 1e4
+
+	flyConnection = RunService.Heartbeat:Connect(function()
+		if not flying then return end
+		local dir = Vector3.zero
+		if UserInputService:IsKeyDown(Enum.KeyCode.W) then dir = dir + Camera.CFrame.LookVector end
+		if UserInputService:IsKeyDown(Enum.KeyCode.S) then dir = dir - Camera.CFrame.LookVector end
+		if UserInputService:IsKeyDown(Enum.KeyCode.A) then dir = dir - Camera.CFrame.RightVector end
+		if UserInputService:IsKeyDown(Enum.KeyCode.D) then dir = dir + Camera.CFrame.RightVector end
+		if UserInputService:IsKeyDown(Enum.KeyCode.Space) then dir = dir + Vector3.new(0, 1, 0) end
+		if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then dir = dir - Vector3.new(0, 1, 0) end
+		vel.Velocity = dir.Magnitude > 0 and dir.Unit * flySpeed or Vector3.zero
+		gyro.CFrame = Camera.CFrame
+	end)
+end
+
+local function stopFly()
+	humanoid.PlatformStand = false
+	if flyConnection then flyConnection:Disconnect() flyConnection = nil end
+	if rootPart:FindFirstChild("FlyVel") then rootPart.FlyVel:Destroy() end
+	if rootPart:FindFirstChild("FlyGyro") then rootPart.FlyGyro:Destroy() end
+end
+
+-- // UI PANEL
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "CyanHub"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = player.PlayerGui
 
+local toggleBtn = Instance.new("TextButton")
+toggleBtn.Size = UDim2.new(0, 100, 0, 30)
+toggleBtn.Position = UDim2.new(0, 10, 0, 10)
+toggleBtn.BackgroundColor3 = Color3.fromRGB(0, 180, 220)
+toggleBtn.TextColor3 = Color3.new(1, 1, 1)
+toggleBtn.Text = "✦ Cyan Hub"
+toggleBtn.Font = Enum.Font.GothamBold
+toggleBtn.TextSize = 13
+toggleBtn.BorderSizePixel = 0
+toggleBtn.Visible = false
+toggleBtn.Parent = screenGui
+Instance.new("UICorner", toggleBtn).CornerRadius = UDim.new(0, 6)
+
 local panel = Instance.new("Frame")
-panel.Size = UDim2.new(0, 270, 0, 420)
+panel.Size = UDim2.new(0, 270, 0, 460)
 panel.Position = UDim2.new(0, 10, 0, 10)
 panel.BackgroundColor3 = Color3.fromRGB(12, 12, 18)
 panel.Active = true
@@ -135,27 +301,65 @@ titleBar.BackgroundColor3 = Color3.fromRGB(0, 170, 210)
 titleBar.Parent = panel
 Instance.new("UICorner", titleBar).CornerRadius = UDim.new(0, 10)
 
+local tbFix = Instance.new("Frame")
+tbFix.Size = UDim2.new(1, 0, 0.5, 0)
+tbFix.Position = UDim2.new(0, 0, 0.5, 0)
+tbFix.BackgroundColor3 = Color3.fromRGB(0, 170, 210)
+tbFix.BorderSizePixel = 0
+tbFix.Parent = titleBar
+
 local titleLabel = Instance.new("TextLabel")
-titleLabel.Size = UDim2.new(1, -10, 1, 0)
+titleLabel.Size = UDim2.new(1, -80, 1, 0)
 titleLabel.Position = UDim2.new(0, 10, 0, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "✦ Cyan Hub Admin"
+titleLabel.Text = "✦ Cyan Hub"
 titleLabel.TextColor3 = Color3.new(1, 1, 1)
 titleLabel.Font = Enum.Font.GothamBold
 titleLabel.TextSize = 16
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
 titleLabel.Parent = titleBar
 
+local hideBtn = Instance.new("TextButton")
+hideBtn.Size = UDim2.new(0, 28, 0, 24)
+hideBtn.Position = UDim2.new(1, -62, 0.5, -12)
+hideBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 55)
+hideBtn.TextColor3 = Color3.new(1, 1, 1)
+hideBtn.Text = "—"
+hideBtn.Font = Enum.Font.GothamBold
+hideBtn.TextSize = 14
+hideBtn.BorderSizePixel = 0
+hideBtn.Parent = titleBar
+Instance.new("UICorner", hideBtn).CornerRadius = UDim.new(0, 5)
+
+local closeBtn = Instance.new("TextButton")
+closeBtn.Size = UDim2.new(0, 28, 0, 24)
+closeBtn.Position = UDim2.new(1, -30, 0.5, -12)
+closeBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+closeBtn.TextColor3 = Color3.new(1, 1, 1)
+closeBtn.Text = "✕"
+closeBtn.Font = Enum.Font.GothamBold
+closeBtn.TextSize = 14
+closeBtn.BorderSizePixel = 0
+closeBtn.Parent = titleBar
+Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(0, 5)
+
 local content = Instance.new("ScrollingFrame")
 content.Size = UDim2.new(1, -16, 1, -50)
 content.Position = UDim2.new(0, 8, 0, 48)
 content.BackgroundTransparency = 1
 content.ScrollBarThickness = 3
+content.ScrollBarImageColor3 = Color3.fromRGB(0, 200, 255)
+content.CanvasSize = UDim2.new(0, 0, 0, 0)
 content.AutomaticCanvasSize = Enum.AutomaticSize.Y
 content.Parent = panel
 
 local layout = Instance.new("UIListLayout", content)
 layout.Padding = UDim.new(0, 6)
+layout.SortOrder = Enum.SortOrder.LayoutOrder
+
+local uiPad = Instance.new("UIPadding", content)
+uiPad.PaddingTop = UDim.new(0, 4)
+uiPad.PaddingBottom = UDim.new(0, 4)
 
 local function makeLabel(text)
 	local lbl = Instance.new("TextLabel")
@@ -178,9 +382,12 @@ local function makeToggle(labelText, callback)
 	btn.Font = Enum.Font.Gotham
 	btn.TextSize = 13
 	btn.TextXAlignment = Enum.TextXAlignment.Left
+	btn.BorderSizePixel = 0
 	btn.Parent = content
 	Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 7)
-	
+	local pad = Instance.new("UIPadding", btn)
+	pad.PaddingLeft = UDim.new(0, 10)
+
 	local active = false
 	btn.MouseButton1Click:Connect(function()
 		active = not active
@@ -191,42 +398,82 @@ local function makeToggle(labelText, callback)
 	end)
 end
 
--- // LISTING COMMANDS
+-- // BUTTONS
 makeLabel("COMBAT")
-makeToggle("Aimlock (/aimlock)", function(state)
+makeToggle("Aimlock (/aimlock to toggle)", function(state)
 	AimlockEnabled = state
 	FOVCircle.Visible = state
 end)
 
-makeLabel("MOVEMENT")
-makeToggle("Fly", function(state) flying = state end)
-makeToggle("Noclip", function(state) noclipping = state end)
-
-makeLabel("PLAYER")
-makeToggle("Invisible", function(state) 
-	if character then
-		for _, v in pairs(character:GetDescendants()) do
-			if v:IsA("BasePart") or v:IsA("Decal") then v.Transparency = state and 1 or 0 end
+makeToggle("ESP", function(state)
+	espEnabled = state
+	if not state then
+		for p, _ in pairs(espObjects) do
+			removeESP(p)
 		end
 	end
 end)
 
-makeToggle("Godmode", function(state) 
+makeLabel("MOVEMENT")
+makeToggle("Fly", function(state)
+	flying = state
+	if state then startFly() else stopFly() end
+end)
+
+makeToggle("Noclip", function(state)
+	noclipping = state
+	if not state and character then
+		for _, p in pairs(character:GetDescendants()) do
+			if p:IsA("BasePart") then p.CanCollide = true end
+		end
+	end
+end)
+
+makeLabel("PLAYER")
+makeToggle("Invisible", function(state)
+	invisible = state
+	if character then
+		for _, v in pairs(character:GetDescendants()) do
+			if v:IsA("BasePart") or v:IsA("Decal") then
+				v.Transparency = state and 1 or 0
+			end
+		end
+	end
+end)
+
+makeToggle("Godmode", function(state)
 	godmode = state
 	if state and humanoid then
 		humanoid.MaxHealth = 9e9
 		humanoid.Health = 9e9
-	else
+	elseif humanoid then
 		humanoid.MaxHealth = 100
 		humanoid.Health = 100
 	end
 end)
 
--- Toggle UI Keybind (RightControl)
+-- // HIDE / CLOSE / SHOW
+hideBtn.MouseButton1Click:Connect(function()
+	panel.Visible = false
+	toggleBtn.Visible = true
+end)
+
+closeBtn.MouseButton1Click:Connect(function()
+	for p, _ in pairs(espObjects) do removeESP(p) end
+	FOVCircle:Remove()
+	screenGui:Destroy()
+end)
+
+toggleBtn.MouseButton1Click:Connect(function()
+	panel.Visible = true
+	toggleBtn.Visible = false
+end)
+
 UserInputService.InputBegan:Connect(function(input, gpe)
 	if not gpe and input.KeyCode == Enum.KeyCode.RightControl then
 		panel.Visible = not panel.Visible
+		toggleBtn.Visible = not panel.Visible
 	end
 end)
 
-print("Cyan Hub Loaded with Wall Check.")
+print("Cyan Hub Loaded!")
