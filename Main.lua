@@ -22,6 +22,8 @@ local FOVRadius = 150
 local flySpeed = 50
 local flyConnection = nil
 local savedTeleportPos = nil
+
+-- Mobile fly direction flags
 local mobileUp = false
 local mobileDown = false
 
@@ -214,14 +216,17 @@ local function startFly()
 	flyConnection = RunService.Heartbeat:Connect(function()
 		if not flying then return end
 		local dir = Vector3.zero
+		-- PC controls
 		if UserInputService:IsKeyDown(Enum.KeyCode.W) then dir = dir + Camera.CFrame.LookVector end
 		if UserInputService:IsKeyDown(Enum.KeyCode.S) then dir = dir - Camera.CFrame.LookVector end
 		if UserInputService:IsKeyDown(Enum.KeyCode.A) then dir = dir - Camera.CFrame.RightVector end
 		if UserInputService:IsKeyDown(Enum.KeyCode.D) then dir = dir + Camera.CFrame.RightVector end
 		if UserInputService:IsKeyDown(Enum.KeyCode.Space) then dir = dir + Vector3.new(0, 1, 0) end
 		if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then dir = dir - Vector3.new(0, 1, 0) end
+		-- Mobile up/down
 		if mobileUp then dir = dir + Vector3.new(0, 1, 0) end
 		if mobileDown then dir = dir - Vector3.new(0, 1, 0) end
+		-- On mobile, also fly in camera direction using thumbstick via humanoid move direction
 		local moveDir = humanoid.MoveDirection
 		if moveDir.Magnitude > 0 then
 			dir = dir + Vector3.new(moveDir.X, 0, moveDir.Z)
@@ -244,7 +249,7 @@ screenGui.Name = "CyanHub"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = player.PlayerGui
 
--- Mobile fly buttons
+-- Mobile fly buttons (Up/Down)
 local mobileControls = Instance.new("Frame")
 mobileControls.Size = UDim2.new(0, 110, 0, 50)
 mobileControls.Position = UDim2.new(1, -120, 1, -160)
@@ -277,16 +282,25 @@ downBtn.Parent = mobileControls
 Instance.new("UICorner", downBtn).CornerRadius = UDim.new(0, 8)
 
 upBtn.InputBegan:Connect(function(i)
-	if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then mobileUp = true end
+	if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then
+		mobileUp = true
+	end
 end)
 upBtn.InputEnded:Connect(function(i)
-	if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then mobileUp = false end
+	if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then
+		mobileUp = false
+	end
 end)
+
 downBtn.InputBegan:Connect(function(i)
-	if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then mobileDown = true end
+	if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then
+		mobileDown = true
+	end
 end)
 downBtn.InputEnded:Connect(function(i)
-	if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then mobileDown = false end
+	if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then
+		mobileDown = false
+	end
 end)
 
 local toggleBtn = Instance.new("TextButton")
@@ -432,94 +446,6 @@ local function makeButton(labelText, color, callback)
 	return btn
 end
 
--- Slider: tap left/right arrows to adjust value
-local function makeSlider(labelText, minVal, maxVal, defaultVal, callback)
-	local holder = Instance.new("Frame")
-	holder.Size = UDim2.new(1, 0, 0, 50)
-	holder.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
-	holder.BorderSizePixel = 0
-	holder.Parent = content
-	Instance.new("UICorner", holder).CornerRadius = UDim.new(0, 7)
-
-	local lbl = Instance.new("TextLabel")
-	lbl.Size = UDim2.new(1, -10, 0, 22)
-	lbl.Position = UDim2.new(0, 10, 0, 2)
-	lbl.BackgroundTransparency = 1
-	lbl.Text = labelText .. ": " .. defaultVal
-	lbl.TextColor3 = Color3.fromRGB(180, 180, 180)
-	lbl.Font = Enum.Font.Gotham
-	lbl.TextSize = 12
-	lbl.TextXAlignment = Enum.TextXAlignment.Left
-	lbl.Parent = holder
-
-	local minusBtn = Instance.new("TextButton")
-	minusBtn.Size = UDim2.new(0, 34, 0, 22)
-	minusBtn.Position = UDim2.new(0, 8, 0, 24)
-	minusBtn.BackgroundColor3 = Color3.fromRGB(0, 100, 140)
-	minusBtn.TextColor3 = Color3.new(1, 1, 1)
-	minusBtn.Text = " - "
-	minusBtn.Font = Enum.Font.GothamBold
-	minusBtn.TextSize = 14
-	minusBtn.BorderSizePixel = 0
-	minusBtn.Parent = holder
-	Instance.new("UICorner", minusBtn).CornerRadius = UDim.new(0, 5)
-
-	local valLbl = Instance.new("TextLabel")
-	valLbl.Size = UDim2.new(1, -96, 0, 22)
-	valLbl.Position = UDim2.new(0, 48, 0, 24)
-	valLbl.BackgroundTransparency = 1
-	valLbl.Text = tostring(defaultVal)
-	valLbl.TextColor3 = Color3.fromRGB(0, 220, 255)
-	valLbl.Font = Enum.Font.GothamBold
-	valLbl.TextSize = 13
-	valLbl.TextXAlignment = Enum.TextXAlignment.Center
-	valLbl.Parent = holder
-
-	local plusBtn = Instance.new("TextButton")
-	plusBtn.Size = UDim2.new(0, 34, 0, 22)
-	plusBtn.Position = UDim2.new(1, -42, 0, 24)
-	plusBtn.BackgroundColor3 = Color3.fromRGB(0, 140, 100)
-	plusBtn.TextColor3 = Color3.new(1, 1, 1)
-	plusBtn.Text = " + "
-	plusBtn.Font = Enum.Font.GothamBold
-	plusBtn.TextSize = 14
-	plusBtn.BorderSizePixel = 0
-	plusBtn.Parent = holder
-	Instance.new("UICorner", plusBtn).CornerRadius = UDim.new(0, 5)
-
-	local currentVal = defaultVal
-	local step = math.max(1, math.floor((maxVal - minVal) / 20))
-
-	local function updateVal(newVal)
-		currentVal = math.clamp(newVal, minVal, maxVal)
-		valLbl.Text = tostring(currentVal)
-		lbl.Text = labelText .. ": " .. currentVal
-		callback(currentVal)
-	end
-
-	minusBtn.MouseButton1Click:Connect(function() updateVal(currentVal - step) end)
-	plusBtn.MouseButton1Click:Connect(function() updateVal(currentVal + step) end)
-
-	-- Hold to repeat
-	local function holdRepeat(btn, dir)
-		btn.InputBegan:Connect(function(i)
-			if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
-				local holding = true
-				btn.InputEnded:Connect(function() holding = false end)
-				task.delay(0.4, function()
-					while holding do
-						updateVal(currentVal + dir * step)
-						task.wait(0.08)
-					end
-				end)
-			end
-		end)
-	end
-
-	holdRepeat(minusBtn, -1)
-	holdRepeat(plusBtn, 1)
-end
-
 -- SECTIONS
 
 makeLabel("COMBAT")
@@ -556,21 +482,6 @@ makeToggle("Noclip", function(state)
 	end
 end)
 
-makeLabel("SPEED")
-makeSlider("Walk Speed", 16, 300, 16, function(val)
-	if humanoid then humanoid.WalkSpeed = val end
-end)
-
-makeLabel("FLY SPEED")
-makeSlider("Fly Speed", 10, 300, 50, function(val)
-	flySpeed = val
-end)
-
-makeLabel("JUMP")
-makeSlider("Jump Height", 7, 200, 7, function(val)
-	if humanoid then humanoid.JumpHeight = val end
-end)
-
 makeLabel("TELEPORT")
 
 local tpStatusLbl = Instance.new("TextLabel")
@@ -599,4 +510,54 @@ makeButton("Teleport", Color3.fromRGB(80, 0, 130), function()
 		rootPart.CFrame = savedTeleportPos
 	else
 		tpStatusLbl.Text = "Set a position first!"
-		tpStatusLbl.TextColor3 = Color3.fromRGB(255, 80, 
+		tpStatusLbl.TextColor3 = Color3.fromRGB(255, 80, 80)
+	end
+end)
+
+makeLabel("PLAYER")
+makeToggle("Invisible", function(state)
+	invisible = state
+	if character then
+		for _, v in pairs(character:GetDescendants()) do
+			if v:IsA("BasePart") or v:IsA("Decal") then
+				v.Transparency = state and 1 or 0
+			end
+		end
+	end
+end)
+makeToggle("Godmode", function(state)
+	godmode = state
+	if state and humanoid then
+		humanoid.MaxHealth = 9e9
+		humanoid.Health = 9e9
+	elseif humanoid then
+		humanoid.MaxHealth = 100
+		humanoid.Health = 100
+	end
+end)
+
+-- Panel controls
+hideBtn.MouseButton1Click:Connect(function()
+	panel.Visible = false
+	toggleBtn.Visible = true
+end)
+
+closeBtn.MouseButton1Click:Connect(function()
+	for p in pairs(espObjects) do removeESP(p) end
+	FOVCircle:Remove()
+	screenGui:Destroy()
+end)
+
+toggleBtn.MouseButton1Click:Connect(function()
+	panel.Visible = true
+	toggleBtn.Visible = false
+end)
+
+UserInputService.InputBegan:Connect(function(input, gpe)
+	if not gpe and input.KeyCode == Enum.KeyCode.RightControl then
+		panel.Visible = not panel.Visible
+		toggleBtn.Visible = not panel.Visible
+	end
+end)
+
+print("Cyan Hub Loaded!")
