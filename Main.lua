@@ -27,7 +27,6 @@ local savedTeleportPos = nil
 local currentSpeed = 16
 local currentJumpPower = 50
 
--- Mobile fly direction flags
 local mobileUp = false
 local mobileDown = false
 
@@ -43,19 +42,16 @@ player.CharacterAdded:Connect(function(c)
 	character = c
 	humanoid = c:WaitForChild("Humanoid")
 	rootPart = c:WaitForChild("HumanoidRootPart")
-	-- Reapply speed/jump on respawn
 	humanoid.WalkSpeed = currentSpeed
 	humanoid.JumpPower = currentJumpPower
 end)
 
--- Infinite Jump
 UserInputService.JumpRequest:Connect(function()
 	if infJumpEnabled and humanoid then
 		humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
 	end
 end)
 
--- ESP
 local espObjects = {}
 
 local function removeESP(p)
@@ -154,7 +150,6 @@ end
 
 Players.PlayerRemoving:Connect(function(p) removeESP(p) end)
 
--- Wall Check
 local function isVisible(targetPart)
 	local origin = Camera.CFrame.Position
 	local destination = targetPart.Position
@@ -167,7 +162,6 @@ local function isVisible(targetPart)
 	return false
 end
 
--- Aimlock
 local function getClosestPlayer()
 	local closestPlayer = nil
 	local shortestDistance = math.huge
@@ -195,7 +189,6 @@ player.Chatted:Connect(function(msg)
 	end
 end)
 
--- Main Loop
 RunService.RenderStepped:Connect(function()
 	FOVCircle.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
 	if AimlockEnabled then
@@ -215,7 +208,6 @@ RunService.RenderStepped:Connect(function()
 	updateESP()
 end)
 
--- Fly
 local function startFly()
 	if not character or not rootPart then return end
 	humanoid.PlatformStand = true
@@ -258,9 +250,9 @@ end
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "CyanHub"
 screenGui.ResetOnSpawn = false
+screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 screenGui.Parent = player.PlayerGui
 
--- Mobile fly buttons
 local mobileControls = Instance.new("Frame")
 mobileControls.Size = UDim2.new(0, 110, 0, 50)
 mobileControls.Position = UDim2.new(1, -120, 1, -160)
@@ -273,7 +265,7 @@ upBtn.Size = UDim2.new(0, 50, 0, 50)
 upBtn.Position = UDim2.new(0, 0, 0, 0)
 upBtn.BackgroundColor3 = Color3.fromRGB(0, 170, 210)
 upBtn.TextColor3 = Color3.new(1, 1, 1)
-upBtn.Text = "â–²"
+upBtn.Text = "▲"
 upBtn.Font = Enum.Font.GothamBold
 upBtn.TextSize = 20
 upBtn.BorderSizePixel = 0
@@ -285,7 +277,7 @@ downBtn.Size = UDim2.new(0, 50, 0, 50)
 downBtn.Position = UDim2.new(0, 58, 0, 0)
 downBtn.BackgroundColor3 = Color3.fromRGB(0, 100, 140)
 downBtn.TextColor3 = Color3.new(1, 1, 1)
-downBtn.Text = "â–¼"
+downBtn.Text = "▼"
 downBtn.Font = Enum.Font.GothamBold
 downBtn.TextSize = 20
 downBtn.BorderSizePixel = 0
@@ -310,7 +302,7 @@ toggleBtn.Size = UDim2.new(0, 100, 0, 30)
 toggleBtn.Position = UDim2.new(0, 10, 0, 10)
 toggleBtn.BackgroundColor3 = Color3.fromRGB(0, 180, 220)
 toggleBtn.TextColor3 = Color3.new(1, 1, 1)
-toggleBtn.Text = "âœ¦ Cyan Hub"
+toggleBtn.Text = "✦ Cyan Hub"
 toggleBtn.Font = Enum.Font.GothamBold
 toggleBtn.TextSize = 13
 toggleBtn.BorderSizePixel = 0
@@ -324,6 +316,7 @@ panel.Position = UDim2.new(0, 10, 0, 10)
 panel.BackgroundColor3 = Color3.fromRGB(12, 12, 18)
 panel.Active = true
 panel.Draggable = true
+panel.Visible = true
 panel.Parent = screenGui
 Instance.new("UICorner", panel).CornerRadius = UDim.new(0, 10)
 
@@ -348,7 +341,7 @@ local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, -80, 1, 0)
 titleLabel.Position = UDim2.new(0, 10, 0, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "âœ¦ Cyan Hub"
+titleLabel.Text = "✦ Cyan Hub"
 titleLabel.TextColor3 = Color3.new(1, 1, 1)
 titleLabel.Font = Enum.Font.GothamBold
 titleLabel.TextSize = 16
@@ -360,7 +353,7 @@ hideBtn.Size = UDim2.new(0, 28, 0, 24)
 hideBtn.Position = UDim2.new(1, -62, 0.5, -12)
 hideBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 55)
 hideBtn.TextColor3 = Color3.new(1, 1, 1)
-hideBtn.Text = "â€”"
+hideBtn.Text = "—"
 hideBtn.Font = Enum.Font.GothamBold
 hideBtn.TextSize = 14
 hideBtn.BorderSizePixel = 0
@@ -372,7 +365,7 @@ closeBtn.Size = UDim2.new(0, 28, 0, 24)
 closeBtn.Position = UDim2.new(1, -30, 0.5, -12)
 closeBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
 closeBtn.TextColor3 = Color3.new(1, 1, 1)
-closeBtn.Text = "âœ•"
+closeBtn.Text = "✕"
 closeBtn.Font = Enum.Font.GothamBold
 closeBtn.TextSize = 14
 closeBtn.BorderSizePixel = 0
@@ -448,7 +441,6 @@ local function makeButton(labelText, color, callback)
 	return btn
 end
 
--- Stepper row: label on left, minus/value/plus on right
 local function makeStepper(labelText, defaultVal, minVal, maxVal, step, onChange)
 	local row = Instance.new("Frame")
 	row.Size = UDim2.new(1, 0, 0, 36)
@@ -473,7 +465,7 @@ local function makeStepper(labelText, defaultVal, minVal, maxVal, step, onChange
 	minusBtn.Position = UDim2.new(1, -96, 0.5, -13)
 	minusBtn.BackgroundColor3 = Color3.fromRGB(0, 100, 140)
 	minusBtn.TextColor3 = Color3.new(1,1,1)
-	minusBtn.Text = "âˆ’"
+	minusBtn.Text = "−"
 	minusBtn.Font = Enum.Font.GothamBold
 	minusBtn.TextSize = 16
 	minusBtn.BorderSizePixel = 0
@@ -503,7 +495,6 @@ local function makeStepper(labelText, defaultVal, minVal, maxVal, step, onChange
 	Instance.new("UICorner", plusBtn).CornerRadius = UDim.new(0, 5)
 
 	local val = defaultVal
-
 	minusBtn.MouseButton1Click:Connect(function()
 		val = math.max(minVal, val - step)
 		valLbl.Text = tostring(val)
@@ -514,12 +505,9 @@ local function makeStepper(labelText, defaultVal, minVal, maxVal, step, onChange
 		valLbl.Text = tostring(val)
 		onChange(val)
 	end)
-
-	return valLbl
 end
 
 -- SECTIONS
-
 makeLabel("COMBAT")
 makeToggle("Aimlock (/aimlock to toggle)", function(state)
 	AimlockEnabled = state
@@ -609,7 +597,6 @@ makeToggle("Invisible", function(state)
 			if v:IsA("BasePart") or v:IsA("Decal") then
 				v.Transparency = state and 1 or 0
 			end
-			end
 		end
 	end
 end)
@@ -624,7 +611,6 @@ makeToggle("Godmode", function(state)
 	end
 end)
 
--- Panel controls
 hideBtn.MouseButton1Click:Connect(function()
 	panel.Visible = false
 	toggleBtn.Visible = true
