@@ -541,8 +541,34 @@ makeToggle("Noclip", function(state)
 		end
 	end
 end)
+
+-- Shift Lock
+local shiftLockEnabled = false
+
+local function enableShiftLock()
+	RunService:BindToRenderStep("ShiftLock", Enum.RenderPriority.Camera.Value + 1, function()
+		if not shiftLockEnabled then return end
+		local hrp = character and character:FindFirstChild("HumanoidRootPart")
+		if hrp then
+			hrp.CFrame = CFrame.new(hrp.Position, hrp.Position + Vector3.new(Camera.CFrame.LookVector.X, 0, Camera.CFrame.LookVector.Z))
+		end
+	end)
+	local UserGameSettings = UserSettings():GetService("UserGameSettings")
+	UserGameSettings.RotationType = Enum.RotationType.CameraRelative
+end
+
+local function disableShiftLock()
+	RunService:UnbindFromRenderStep("ShiftLock")
+	local UserGameSettings = UserSettings():GetService("UserGameSettings")
+	UserGameSettings.RotationType = Enum.RotationType.MovementRelative
+end
+
 makeToggle("Infinite Jump", function(state)
 	infJumpEnabled = state
+end)
+makeToggle("Shift Lock", function(state)
+	shiftLockEnabled = state
+	if state then enableShiftLock() else disableShiftLock() end
 end)
 
 makeLabel("SPEED")
