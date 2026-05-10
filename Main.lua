@@ -513,6 +513,9 @@ makeToggle("Aimlock (/aimlock to toggle)", function(state)
 	AimlockEnabled = state
 	FOVCircle.Visible = state
 end)
+makeToggle("Hide FOV Circle", function(state)
+	FOVCircle.Visible = not state and AimlockEnabled
+end)
 makeToggle("ESP", function(state)
 	espEnabled = state
 	if not state then
