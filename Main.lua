@@ -524,6 +524,85 @@ makeToggle("ESP", function(state)
 end)
 
 makeLabel("MOVEMENT")
+-- Freecam variables
+local freecamEnabled = false
+local freecamCF = CFrame.new(0, 5, 0)
+local freecamSpeed = 1
+local fcUp, fcDown, fcLeft, fcRight, fcRiseUp, fcRiseDn = false,false,false,false,false,false
+
+local freecamControls = Instance.new("Frame")
+freecamControls.Size = UDim2.new(0, 160, 0, 160)
+freecamControls.Position = UDim2.new(0, 10, 1, -180)
+freecamControls.BackgroundTransparency = 1
+freecamControls.Visible = false
+freecamControls.Parent = screenGui
+
+local freecamUpDownFrame = Instance.new("Frame")
+freecamUpDownFrame.Size = UDim2.new(0, 60, 0, 110)
+freecamUpDownFrame.Position = UDim2.new(1, -70, 1, -180)
+freecamUpDownFrame.BackgroundTransparency = 1
+freecamUpDownFrame.Visible = false
+freecamUpDownFrame.Parent = screenGui
+
+local function makeFreecamBtn(text, pos, parent, onDown, onUp)
+	local btn = Instance.new("TextButton")
+	btn.Size = UDim2.new(0, 50, 0, 50)
+	btn.Position = pos
+	btn.BackgroundColor3 = Color3.fromRGB(0, 140, 180)
+	btn.TextColor3 = Color3.new(1,1,1)
+	btn.Text = text
+	btn.Font = Enum.Font.GothamBold
+	btn.TextSize = 18
+	btn.BorderSizePixel = 0
+	btn.Parent = parent
+	Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
+	btn.InputBegan:Connect(function(i)
+		if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then onDown() end
+	end)
+	btn.InputEnded:Connect(function(i)
+		if i.UserInputType == Enum.UserInputType.Touch or i.UserInputType == Enum.UserInputType.MouseButton1 then onUp() end
+	end)
+end
+
+makeFreecamBtn("▲", UDim2.new(0, 55, 0, 0), freecamControls, function() fcUp = true end, function() fcUp = false end)
+makeFreecamBtn("▼", UDim2.new(0, 55, 0, 110), freecamControls, function() fcDown = true end, function() fcDown = false end)
+makeFreecamBtn("◄", UDim2.new(0, 0, 0, 55), freecamControls, function() fcLeft = true end, function() fcLeft = false end)
+makeFreecamBtn("►", UDim2.new(0, 110, 0, 55), freecamControls, function() fcRight = true end, function() fcRight = false end)
+makeFreecamBtn("↑", UDim2.new(0, 0, 0, 0), freecamUpDownFrame, function() fcRiseUp = true end, function() fcRiseUp = false end)
+makeFreecamBtn("↓", UDim2.new(0, 0, 0, 60), freecamUpDownFrame, function() fcRiseDn = true end, function() fcRiseDn = false end)
+
+local function enableFreecam()
+	if not character or not rootPart then return end
+	freecamCF = Camera.CFrame
+	Camera.CameraType = Enum.CameraType.Scriptable
+	freecamControls.Visible = true
+	freecamUpDownFrame.Visible = true
+	humanoid.WalkSpeed = 0
+	RunService:BindToRenderStep("Freecam", Enum.RenderPriority.Camera.Value + 1, function()
+		if not freecamEnabled then return end
+		local moveDir = Vector3.zero
+		if fcUp then moveDir = moveDir + freecamCF.LookVector end
+		if fcDown then moveDir = moveDir - freecamCF.LookVector end
+		if fcLeft then moveDir = moveDir - freecamCF.RightVector end
+		if fcRight then moveDir = moveDir + freecamCF.RightVector end
+		if fcRiseUp then moveDir = moveDir + Vector3.new(0,1,0) end
+		if fcRiseDn then moveDir = moveDir - Vector3.new(0,1,0) end
+		if moveDir.Magnitude > 0 then
+			freecamCF = freecamCF * CFrame.new(moveDir.Unit * freecamSpeed)
+		end
+		Camera.CFrame = freecamCF
+	end)
+end
+
+local function disableFreecam()
+	RunService:UnbindFromRenderStep("Freecam")
+	Camera.CameraType = Enum.CameraType.Custom
+	freecamControls.Visible = false
+	freecamUpDownFrame.Visible = false
+	humanoid.WalkSpeed = currentSpeed
+end
+
+makeLabel("MOVEMENT")
 makeToggle("Fly", function(state)
 	flying = state
 	if state then
@@ -544,28 +623,10 @@ makeToggle("Noclip", function(state)
 		end
 	end
 end)
-
--- Shift Lock
-local shiftLockEnabled = false
-
-local function enableShiftLock()
-	RunService:BindToRenderStep("ShiftLock", Enum.RenderPriority.Camera.Value + 1, function()
-		if not shiftLockEnabled then return end
-		local hrp = character and character:FindFirstChild("HumanoidRootPart")
-		if hrp then
-			hrp.CFrame = CFrame.new(hrp.Position, hrp.Position + Vector3.new(Camera.CFrame.LookVector.X, 0, Camera.CFrame.LookVector.Z))
-		end
-	end)
-	local UserGameSettings = UserSettings():GetService("UserGameSettings")
-	UserGameSettings.RotationType = Enum.RotationType.CameraRelative
-end
-
-local function disableShiftLock()
-	RunService:UnbindFromRenderStep("ShiftLock")
-	local UserGameSettings = UserSettings():GetService("UserGameSettings")
-	UserGameSettings.RotationType = Enum.RotationType.MovementRelative
-end
-
+makeToggle("Freecam", function(state)
+	freecamEnabled = state
+	if state then enableFreecam() else disableFreecam() end
+end)
 makeToggle("Infinite Jump", function(state)
 	infJumpEnabled = state
 end)
@@ -573,19 +634,6 @@ makeToggle("Shift Lock", function(state)
 	shiftLockEnabled = state
 	if state then enableShiftLock() else disableShiftLock() end
 end)
-
-makeLabel("SPEED")
-makeStepper("Walk Speed", currentSpeed, 4, 500, 4, function(val)
-	currentSpeed = val
-	if humanoid then humanoid.WalkSpeed = val end
-end)
-
-makeLabel("JUMP POWER")
-makeStepper("Jump Power", currentJumpPower, 10, 500, 10, function(val)
-	currentJumpPower = val
-	if humanoid then humanoid.JumpPower = val end
-end)
-
 makeLabel("TELEPORT")
 
 local tpStatusLbl = Instance.new("TextLabel")
