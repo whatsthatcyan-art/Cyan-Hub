@@ -523,6 +523,20 @@ makeToggle("ESP", function(state)
 	end
 end)
 
+makeLabel("HITBOX")
+makeStepper("Hitbox Size", 1, 1, 20, 1, function(val)
+	for _, p in pairs(Players:GetPlayers()) do
+		if p == player then continue end
+		local char = p.Character
+		if not char then continue end
+		for _, part in pairs(char:GetDescendants()) do
+			if part:IsA("BasePart") then
+				part.Size = Vector3.new(val, val, val)
+			end
+		end
+	end
+end)
+
 makeLabel("MOVEMENT")
 -- Freecam variables
 local freecamEnabled = false
