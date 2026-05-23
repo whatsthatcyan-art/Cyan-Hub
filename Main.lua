@@ -192,11 +192,14 @@ end)
 RunService.RenderStepped:Connect(function()
 	FOVCircle.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
 	if AimlockEnabled then
-		local target = getClosestPlayer()
-		if target and target.Character and target.Character:FindFirstChild(AimPart) then
-			Camera.CFrame = CFrame.new(Camera.CFrame.Position, target.Character[AimPart].Position)
-		end
+	local target = getClosestPlayer()
+	if target and target.Character and target.Character:FindFirstChild(AimPart) then
+		local targetPos = target.Character[AimPart].Position
+		local newCFrame = CFrame.new(Camera.CFrame.Position, targetPos)
+		Camera.CFrame = Camera.CFrame:Lerp(newCFrame, 0.15)
 	end
+		end
+		
 	if noclipping and character then
 		for _, part in pairs(character:GetDescendants()) do
 			if part:IsA("BasePart") then part.CanCollide = false end
